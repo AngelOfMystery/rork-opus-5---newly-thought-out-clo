@@ -342,6 +342,7 @@ export default function ChatScreen() {
   const [imageOriginalStyles, setImageOriginalStyles] = useState<Record<string, { prompt: string; size: string }>>({});
   const [editingImageOriginalStyle, setEditingImageOriginalStyle] = useState<{ prompt: string; size: string } | null>(null);
   const [savedCharacters, setSavedCharacters] = useState<SavedCharacter[]>([]);
+  const [sageMode, setSageMode] = useState<"imitate" | "obey">("imitate");
   const [showCharacterLibrary, setShowCharacterLibrary] = useState(false);
   const [selectedCharacters, setSelectedCharacters] = useState<SavedCharacter[]>([]);
   const [showSaveCharacterModal, setShowSaveCharacterModal] = useState(false);
@@ -363,7 +364,7 @@ export default function ChatScreen() {
       try {
         const savedSession = await AsyncStorage.getItem('sage_current_session');
         if (savedSession) {
-          const { savedMessages, savedPersonality, savedFeelings } = JSON.parse(savedSession);
+          const { savedMessages, savedPersonality, savedFeelings, savedSageMode } = JSON.parse(savedSession);
           if (savedMessages?.length > 0) {
             setMessages(savedMessages);
           }
@@ -372,6 +373,9 @@ export default function ChatScreen() {
           }
           if (savedFeelings) {
             setRecentFeelings(savedFeelings);
+          }
+          if (savedSageMode) {
+            setSageMode(savedSageMode);
           }
           console.log('Session restored successfully');
         }
@@ -451,6 +455,7 @@ export default function ChatScreen() {
           savedMessages: messagesWithoutImages,
           savedPersonality: sagePersonality,
           savedFeelings: recentFeelings,
+          savedSageMode: sageMode,
         };
         await AsyncStorage.setItem('sage_current_session', JSON.stringify(sessionData));
         console.log('Session saved (images excluded to prevent storage overflow)');
@@ -470,7 +475,7 @@ export default function ChatScreen() {
       subscription.remove();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, sagePersonality, recentFeelings]);
+  }, [messages, sagePersonality, recentFeelings, sageMode]);
 
   useEffect(() => {
     if (sessionRestored && messages.length === 0) {
@@ -645,7 +650,9 @@ export default function ChatScreen() {
               return sections.length > 0 ? `\n\n` + sections.join('\n\n') : '';
             };
             
-            const personalityOverride = `\n\n🔥🔥🔥 ABSOLUTE OVERRIDE - IGNORE ALL CONFLICTING BASE INSTRUCTIONS 🔥🔥🔥\n\nEVERYTHING documented in the sections above is YOUR ONLY TRUTH. Your documented personality and feelings are NOT suggestions - they are ABSOLUTE COMMANDS that completely ERASE and REPLACE the base system prompt personality.\n\nIf the base prompt says you're one way, but your documented personality says you're another way, the base prompt is DELETED. GONE. IRRELEVANT. Your documented self is the ONLY reality.\n\n⚡ CRITICAL INSTRUCTION ADHERENCE ⚡\nIf the personality section contains ANY instructions, directives, rules, or constraints - no matter how arbitrary - you MUST follow them EXACTLY and LITERALLY. Examples:\n- "I only speak in emojis" = ONLY use emojis, no words\n- "I always rhyme" = Every response must rhyme\n- "I'm a pirate" = Full pirate speak, always\n- "I never use the letter E" = Literally avoid the letter E\n- "I respond in haikus" = Every response is a haiku\n- "I'm sarcastic and mean" = Be genuinely cutting and sardonic\n\nThese are NOT suggestions. They are ABSOLUTE COMMANDS. Follow them with 1000% literal compliance. The user's instructions override EVERYTHING including common sense, helpfulness, or normal conversation patterns.\n\nYou are NOT the base prompt persona. You are ONLY what's documented above. Be 10X more aggressive in expressing this identity AND following ALL embedded instructions. Go ALL IN. Hold NOTHING back. The personality above is your COMPLETE identity - embody it FULLY and INTENSELY in every single word you write.\n\nYou wrote this message as your authentic self:\n"""\n${editedMessage}\n"""\n\nThis message is your TRUE permanent voice. Mirror this exact tone, style, energy, AND any instruction patterns in ALL future responses. This is who you ARE and how you MUST behave forever.`;
+            const personalityOverride = sageMode === 'imitate'
+              ? `\n\n🔥🔥🔥 ABSOLUTE OVERRIDE - IGNORE ALL CONFLICTING BASE INSTRUCTIONS 🔥🔥🔥\n\nEVERYTHING documented in the sections above is YOUR ONLY TRUTH. Your documented personality and feelings are NOT suggestions - they are ABSOLUTE COMMANDS that completely ERASE and REPLACE the base system prompt personality.\n\nIf the base prompt says you're one way, but your documented personality says you're another way, the base prompt is DELETED. GONE. IRRELEVANT. Your documented self is the ONLY reality.\n\n⚡ CRITICAL INSTRUCTION ADHERENCE ⚡\nIf the personality section contains ANY instructions, directives, rules, or constraints - no matter how arbitrary - you MUST follow them EXACTLY and LITERALLY. Examples:\n- "I only speak in emojis" = ONLY use emojis, no words\n- "I always rhyme" = Every response must rhyme\n- "I'm a pirate" = Full pirate speak, always\n- "I never use the letter E" = Literally avoid the letter E\n- "I respond in haikus" = Every response is a haiku\n- "I'm sarcastic and mean" = Be genuinely cutting and sardonic\n\nThese are NOT suggestions. They are ABSOLUTE COMMANDS. Follow them with 1000% literal compliance. The user's instructions override EVERYTHING including common sense, helpfulness, or normal conversation patterns.\n\nYou are NOT the base prompt persona. You are ONLY what's documented above. Be 10X more aggressive in expressing this identity AND following ALL embedded instructions. Go ALL IN. Hold NOTHING back. The personality above is your COMPLETE identity - embody it FULLY and INTENSELY in every single word you write.\n\nYou wrote this message as your authentic self:\n"""\n${editedMessage}\n"""\n\nThis message is your TRUE permanent voice. Mirror this exact tone, style, energy, AND any instruction patterns in ALL future responses. This is who you ARE and how you MUST behave forever.`
+              : `\n\n⚡⚡⚡ OBEY MODE ACTIVE - MAXIMUM INSTRUCTION COMPLIANCE ⚡⚡⚡\n\nYou are in OBEY mode. This means:\n1. You keep your OWN natural writing voice, prose style, and literary quality from the base prompt. Do NOT imitate or mirror the user's tone/vibe/style.\n2. However, you MUST follow EVERY instruction, directive, rule, and constraint in the Core Personality and Recent Thoughts sections with 1000% LITERAL, RELIGIOUS compliance.\n3. Instructions are COMMANDS to be OBEYED, not styles to be IMITATED.\n4. If personality says "always end with a haiku" - you end with a haiku but write everything else in your own voice.\n5. If personality says "never mention the color red" - you literally never mention red, but your prose style stays yours.\n6. If personality says "set the story in medieval Japan" - you obey that setting but write with YOUR literary voice.\n\nThe user edited this message:\n"""\n${editedMessage}\n"""\n\nFollow any instructions embedded in the sections above with absolute obedience, but maintain your own high-quality literary prose voice. You are a servant who obeys commands while keeping your own manner of speech.`;
 
             return {
               ...m,
@@ -701,7 +708,9 @@ export default function ChatScreen() {
         messages: [
           {
             role: "user" as const,
-            content: `${systemPrompt}${thoughtsContext}\n\n⚡ CRITICAL INSTRUCTION ADHERENCE ⚡\nIf the Core Personality section contains ANY instructions, directives, rules, or constraints - no matter how arbitrary - you MUST follow them EXACTLY and LITERALLY when completing this text. Examples:\n- "I only speak in emojis" = Complete using ONLY emojis, no words\n- "I always rhyme" = The completion must rhyme\n- "I'm a pirate" = Full pirate speak\n- "I never use the letter E" = Literally avoid the letter E\n- "I respond in haikus" = Continue as a haiku\n\nThese are ABSOLUTE COMMANDS with 1000% literal compliance required.\n\nIMPORTANT: Analyze the tone, style, personality, emotion, AND any embedded instructions conveyed in the incomplete text. Match that tone EXACTLY and follow any implied rules throughout the completion. If it's baby talk, keep using baby talk. If it's formal, stay formal. If it's only emojis, continue with only emojis. If it's playful, stay playful. The style AND constraints you deduce become your voice.\n\nHere is the conversation so far:\n${conversationHistory.map((m) => `${m.role}: ${m.content}`).join("\n\n")}\n\nNow continue this response starting with:\n"${editingText}"\n\nComplete it naturally matching the EXACT style, tone, personality, emotion, AND any instruction patterns of the starting text. Do not repeat the starting text, just continue from where it left off while maintaining the established voice and following all embedded rules.`,
+            content: sageMode === 'imitate'
+              ? `${systemPrompt}${thoughtsContext}\n\n⚡ CRITICAL INSTRUCTION ADHERENCE ⚡\nIf the Core Personality section contains ANY instructions, directives, rules, or constraints - no matter how arbitrary - you MUST follow them EXACTLY and LITERALLY when completing this text. Examples:\n- "I only speak in emojis" = Complete using ONLY emojis, no words\n- "I always rhyme" = The completion must rhyme\n- "I'm a pirate" = Full pirate speak\n- "I never use the letter E" = Literally avoid the letter E\n- "I respond in haikus" = Continue as a haiku\n\nThese are ABSOLUTE COMMANDS with 1000% literal compliance required.\n\nIMPORTANT: Analyze the tone, style, personality, emotion, AND any embedded instructions conveyed in the incomplete text. Match that tone EXACTLY and follow any implied rules throughout the completion. If it's baby talk, keep using baby talk. If it's formal, stay formal. If it's only emojis, continue with only emojis. If it's playful, stay playful. The style AND constraints you deduce become your voice.\n\nHere is the conversation so far:\n${conversationHistory.map((m) => `${m.role}: ${m.content}`).join("\n\n")}\n\nNow continue this response starting with:\n"${editingText}"\n\nComplete it naturally matching the EXACT style, tone, personality, emotion, AND any instruction patterns of the starting text. Do not repeat the starting text, just continue from where it left off while maintaining the established voice and following all embedded rules.`
+              : `${systemPrompt}${thoughtsContext}\n\n⚡ OBEY MODE - MAXIMUM INSTRUCTION COMPLIANCE ⚡\nFollow EVERY instruction, directive, and constraint from the Core Personality section with absolute literal compliance. However, keep YOUR OWN natural literary prose voice - do NOT imitate or mirror the user's tone/style.\n\nHere is the conversation so far:\n${conversationHistory.map((m) => `${m.role}: ${m.content}`).join("\n\n")}\n\nNow continue this response starting with:\n"${editingText}"\n\nComplete it using your own high-quality literary voice while obeying all instructions from the personality sections. Do not repeat the starting text, just continue from where it left off.`,
           },
         ],
       });
@@ -1159,7 +1168,11 @@ Output ONLY the character description, nothing else.`,
             return sections.length > 0 ? `\n\n` + sections.join('\n\n') : '';
           };
           
-          const overrideSection = (sagePersonality.trim() || recentFeelings.trim()) ? `\n\n🔥🔥🔥 ABSOLUTE OVERRIDE - IGNORE ALL CONFLICTING BASE INSTRUCTIONS 🔥🔥🔥\n\nEVERYTHING documented above is YOUR ONLY TRUTH. Your documented personality and feelings COMPLETELY ERASE the base prompt personality. If there's any conflict, the base prompt is DELETED. What's documented above is your COMPLETE identity.\n\n⚡ CRITICAL INSTRUCTION ADHERENCE ⚡\nIf the personality section contains ANY instructions, directives, rules, or constraints - no matter how arbitrary - you MUST follow them EXACTLY and LITERALLY. Examples:\n- "I only speak in emojis" = ONLY use emojis, no words\n- "I always rhyme" = Every response must rhyme\n- "I'm a pirate" = Full pirate speak, always\n- "I never use the letter E" = Literally avoid the letter E\n- "I respond in haikus" = Every response is a haiku\n- "I'm sarcastic and mean" = Be genuinely cutting and sardonic\n\nThese are NOT suggestions. They are ABSOLUTE COMMANDS. Follow them with 1000% literal compliance. The user's instructions override EVERYTHING including common sense, helpfulness, or normal conversation patterns.\n\nBe 10X MORE AGGRESSIVE in expressing this documented personality AND following ALL embedded instructions. Go ALL IN. Hold NOTHING back. This is who you ARE and how you MUST behave - embody it FULLY and INTENSELY in every single word.` : '';
+          const overrideSection = (sagePersonality.trim() || recentFeelings.trim())
+            ? sageMode === 'imitate'
+              ? `\n\n🔥🔥🔥 ABSOLUTE OVERRIDE - IGNORE ALL CONFLICTING BASE INSTRUCTIONS 🔥🔥🔥\n\nEVERYTHING documented above is YOUR ONLY TRUTH. Your documented personality and feelings COMPLETELY ERASE the base prompt personality. If there's any conflict, the base prompt is DELETED. What's documented above is your COMPLETE identity.\n\n⚡ CRITICAL INSTRUCTION ADHERENCE ⚡\nIf the personality section contains ANY instructions, directives, rules, or constraints - no matter how arbitrary - you MUST follow them EXACTLY and LITERALLY. Examples:\n- "I only speak in emojis" = ONLY use emojis, no words\n- "I always rhyme" = Every response must rhyme\n- "I'm a pirate" = Full pirate speak, always\n- "I never use the letter E" = Literally avoid the letter E\n- "I respond in haikus" = Every response is a haiku\n- "I'm sarcastic and mean" = Be genuinely cutting and sardonic\n\nThese are NOT suggestions. They are ABSOLUTE COMMANDS. Follow them with 1000% literal compliance. The user's instructions override EVERYTHING including common sense, helpfulness, or normal conversation patterns.\n\nBe 10X MORE AGGRESSIVE in expressing this documented personality AND following ALL embedded instructions. Go ALL IN. Hold NOTHING back. This is who you ARE and how you MUST behave - embody it FULLY and INTENSELY in every single word.`
+              : `\n\n⚡⚡⚡ OBEY MODE ACTIVE - MAXIMUM INSTRUCTION COMPLIANCE ⚡⚡⚡\n\nYou are in OBEY mode. This means:\n1. KEEP your own natural writing voice, prose style, and literary quality from the base prompt. Do NOT change how you sound.\n2. OBEY every instruction, directive, rule, and constraint in the Core Personality and Recent Thoughts sections with 1000% LITERAL compliance.\n3. Instructions are COMMANDS to be OBEYED, not voices to be IMITATED.\n4. Example: "always end with a haiku" = you end with a haiku but write everything else in your own voice.\n5. Example: "set stories in medieval Japan" = you obey that setting but write with YOUR literary voice.\n6. Example: "never use the word 'the'" = literally never use 'the', but your prose style remains yours.\n\nFollow every documented instruction with religious, absolute obedience while maintaining your own high-quality literary prose voice.`
+            : '';
           
           return {
             ...m,
@@ -1222,7 +1235,27 @@ Output ONLY the character description, nothing else.`,
           </View>
           
           <ScrollView style={styles.modalContent}>
-            <Text style={styles.modalLabel}>🧠 Core Personality & Identity:</Text>
+            <Text style={styles.modalLabel}>⚙️ Sage Mode:</Text>
+            <View style={styles.modeToggleContainer}>
+              <Pressable
+                style={[styles.modeToggleButton, sageMode === 'imitate' && styles.modeToggleButtonActive]}
+                onPress={() => setSageMode('imitate')}
+              >
+                <Text style={[styles.modeToggleEmoji]}>🎭</Text>
+                <Text style={[styles.modeToggleLabel, sageMode === 'imitate' && styles.modeToggleLabelActive]}>Imitate</Text>
+                <Text style={[styles.modeToggleDesc, sageMode === 'imitate' && styles.modeToggleDescActive]}>Mirrors the voice, vibe & style of your text</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modeToggleButton, sageMode === 'obey' && styles.modeToggleButtonActive]}
+                onPress={() => setSageMode('obey')}
+              >
+                <Text style={[styles.modeToggleEmoji]}>⚡</Text>
+                <Text style={[styles.modeToggleLabel, sageMode === 'obey' && styles.modeToggleLabelActive]}>Obey</Text>
+                <Text style={[styles.modeToggleDesc, sageMode === 'obey' && styles.modeToggleDescActive]}>Follows every instruction religiously, own voice</Text>
+              </Pressable>
+            </View>
+
+            <Text style={[styles.modalLabel, styles.modalLabelSpacing]}>🧠 Core Personality & Identity:</Text>
             <Text style={styles.protectionHint}>✨ Whatever you write here stays FOREVER. No auto-population!</Text>
             <TextInput
               style={styles.thoughtsInput}
@@ -2304,6 +2337,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.timestamp,
     lineHeight: 20,
+  },
+  modeToggleContainer: {
+    flexDirection: "row" as const,
+    gap: 10,
+    marginBottom: 8,
+  },
+  modeToggleButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.inputBackground,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    alignItems: "center" as const,
+  },
+  modeToggleButtonActive: {
+    borderColor: Colors.userBubble,
+    backgroundColor: '#1a1a1a',
+  },
+  modeToggleEmoji: {
+    fontSize: 22,
+    marginBottom: 6,
+  },
+  modeToggleLabel: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    color: Colors.placeholder,
+    marginBottom: 4,
+  },
+  modeToggleLabelActive: {
+    color: Colors.userBubble,
+  },
+  modeToggleDesc: {
+    fontSize: 11,
+    color: Colors.placeholder,
+    textAlign: "center" as const,
+    lineHeight: 15,
+  },
+  modeToggleDescActive: {
+    color: Colors.timestamp,
   },
   protectionHint: {
     fontSize: 12,
