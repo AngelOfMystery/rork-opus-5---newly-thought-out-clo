@@ -391,7 +391,7 @@ export default function ChatScreen() {
         setSessionRestored(true);
       }
     };
-    restoreSession();
+    void restoreSession();
   }, [setMessages]);
 
   const saveCharactersToStorage = async (characters: SavedCharacter[]) => {
@@ -466,7 +466,7 @@ export default function ChatScreen() {
 
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (appStateRef.current === 'active' && nextAppState.match(/inactive|background/)) {
-        saveSession();
+        void saveSession();
       }
       appStateRef.current = nextAppState;
     });
@@ -524,7 +524,7 @@ export default function ChatScreen() {
       setIsTyping(true);
       
       try {
-        await sendMessage(message);
+        sendMessage(message);
       } catch (error) {
         console.error("Error sending message:", error);
       } finally {
@@ -579,7 +579,7 @@ export default function ChatScreen() {
     setIsTyping(true);
 
     try {
-      await sendMessage(userMessage.text);
+      sendMessage(userMessage.text);
     } catch (error) {
       console.error("Error retrying message:", error);
     } finally {
@@ -613,7 +613,7 @@ export default function ChatScreen() {
       setIsTyping(true);
 
       try {
-        await sendMessage(editingText.trim());
+        sendMessage(editingText.trim());
       } finally {
         setIsTyping(false);
       }
@@ -849,13 +849,13 @@ export default function ChatScreen() {
 
   const handleAutoDescribeCharacter = async () => {
     if (!pendingCharacterImage || isAnalyzingCharacter) return;
-    
+
     setIsAnalyzingCharacter(true);
-    console.log('Starting AI character analysis...');
-    
+    console.log('Starting AI seed analysis...');
+
     try {
       const imageData = `data:${pendingCharacterImage.mimeType};base64,${pendingCharacterImage.base64Data}`;
-      
+
       const description = await generateText({
         messages: [
           {
@@ -867,46 +867,56 @@ export default function ChatScreen() {
               },
               {
                 type: "text" as const,
-                text: `You are a character description specialist. Analyze this image and create an EXTREMELY DETAILED character description that can be used as a "seed" to regenerate this exact character in future AI image generations.
+                text: `You are a visual seed description specialist. Analyze this image and create an EXTREMELY DETAILED reusable seed description for the main saved subject or subjects in the image.
 
-Include ALL of the following details (if visible):
+The saved subject may be ANY of the following:
+- a character or multiple characters
+- a creature, animal, monster, or pet
+- an item, prop, outfit, accessory, weapon, vehicle, or object
+- a room, building, landmark, environment, location, or scene
+- any other specific visual subject the user may want to save and reuse later
 
-**Physical Appearance:**
-- Exact hair color, style, length, texture (e.g., "platinum blonde wavy hair reaching mid-back with side-swept bangs")
-- Eye color and shape (e.g., "large almond-shaped emerald green eyes with long lashes")
-- Skin tone (e.g., "fair porcelain skin with rosy cheeks")
-- Face shape and features (nose, lips, eyebrows, etc.)
-- Body type and height impression
-- Age appearance
-- Any distinctive features (freckles, moles, scars, etc.)
+Your job is NOT to assume it is only a character. First identify what the image is mainly showcasing, then describe that subject with maximum visual fidelity so it can be reused consistently in future AI image generations.
 
-**Clothing & Accessories:**
-- Every piece of clothing with colors, patterns, materials
-- Jewelry, hair accessories, glasses, etc.
-- Shoes if visible
+Include all visible details that matter for regeneration, when relevant:
 
-**Art Style:**
-- The exact art style (anime, realistic, cartoon, watercolor, etc.)
-- Color palette and lighting style
-- Level of detail and line work
+**Identity of the subject:**
+- What kind of subject it is
+- If there are multiple important subjects, describe each one clearly
+- The defining visual identity that makes this subject recognizable
 
-**Pose & Expression:**
-- Current pose and body language
-- Facial expression
+**Visual details:**
+- Shape, silhouette, proportions, scale, structure
+- Colors using precise color names
+- Materials, textures, finishes, patterns, wear, surface details
+- Distinctive features, markings, decorations, motifs, damage, special traits
 
-Write the description as a dense, detailed paragraph that could be used directly as an image generation prompt. Be specific about colors (use precise color names), proportions, and style. Do NOT include background elements - focus only on the character(s).
+**If living beings are present:**
+- Hair, fur, feathers, skin, eyes, facial structure, anatomy, body type, age impression, species traits, clothing, accessories, pose, expression, body language
 
-Output ONLY the character description, nothing else.`,
+**If objects/items are present:**
+- Form, construction, materials, colors, components, decorative elements, craftsmanship, condition, and any unique design language
+
+**If locations/scenes are present:**
+- Layout, architecture, terrain, furnishings, set dressing, atmosphere, lighting, weather, environmental details, and the exact visual style of the place
+
+**Art style:**
+- Exact art style or medium
+- Rendering style, line work, shading, detail level, color palette, lighting treatment
+
+Write the result as one dense, highly specific paragraph or tightly connected paragraphs that can be used directly as an image-generation seed. Focus on the reusable subject itself and any essential visual context needed to preserve it accurately. Do not write conversationally. Do not explain your process.
+
+Output ONLY the seed description, nothing else.`,
               },
             ],
           },
         ],
       });
-      
+
       console.log('AI analysis complete:', description.substring(0, 100) + '...');
       setNewCharacterDescription(description);
     } catch (error) {
-      console.error('Error analyzing character:', error);
+      console.error('Error analyzing saved subject:', error);
     } finally {
       setIsAnalyzingCharacter(false);
     }
@@ -1834,7 +1844,7 @@ Output ONLY the character description, nothing else.`,
                         style={styles.characterDeleteButton}
                         onPress={(e) => {
                           e.stopPropagation();
-                          handleDeleteCharacter(character.id);
+                          void handleDeleteCharacter(character.id);
                         }}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
@@ -1883,7 +1893,7 @@ Output ONLY the character description, nothing else.`,
               <View style={styles.imageModalTitleIcon}>
                 <Plus size={24} color={Colors.userBubble} />
               </View>
-              <Text style={styles.imageModalTitle}>Save Character</Text>
+              <Text style={styles.imageModalTitle}>Save Seed</Text>
             </View>
             <Pressable
               onPress={() => setShowSaveCharacterModal(false)}
@@ -1896,7 +1906,7 @@ Output ONLY the character description, nothing else.`,
 
           <ScrollView style={styles.imageModalContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.imageModalSubtitle}>
-              Save this character to reuse in future generations with consistent appearance ✨
+              Save this subject to reuse in future generations with consistent visuals ✨
             </Text>
 
             {pendingCharacterImage && (
@@ -1909,17 +1919,17 @@ Output ONLY the character description, nothing else.`,
               </View>
             )}
 
-            <Text style={styles.imageSizeLabel}>Character Name:</Text>
+            <Text style={styles.imageSizeLabel}>Seed Name:</Text>
             <TextInput
               style={styles.characterNameInput}
               value={newCharacterName}
               onChangeText={setNewCharacterName}
-              placeholder="e.g., Luna, The Blonde Girl, Detective Marcus..."
+              placeholder="e.g., Luna, Crystal Dagger, Moonlit Courtyard, Forest Beast..."
               placeholderTextColor={Colors.placeholder}
             />
 
             <View style={styles.descriptionLabelRow}>
-              <Text style={styles.imageSizeLabel}>Character Description (Seed):</Text>
+              <Text style={styles.imageSizeLabel}>Seed Description:</Text>
               <Pressable
                 style={[
                   styles.autoDescribeButton,
@@ -1938,13 +1948,13 @@ Output ONLY the character description, nothing else.`,
               </Pressable>
             </View>
             <Text style={styles.seedDescriptionHint}>
-              Tap &quot;AI Describe&quot; to auto-generate a detailed description, or write your own!
+              Tap &quot;AI Describe&quot; to auto-generate a detailed seed for characters, items, creatures, locations, or anything else in the image.
             </Text>
             <TextInput
               style={styles.imagePromptInput}
               value={newCharacterDescription}
               onChangeText={setNewCharacterDescription}
-              placeholder="A young blonde girl with bright blue eyes, fair skin, wearing a light blue sundress with white polka dots. She has shoulder-length wavy hair with a small bow clip. Anime-inspired art style with soft pastel colors..."
+              placeholder="A moonlit stone courtyard with ivy-covered arches, damp cobblestones, silver-blue fog, wrought iron lanterns, and painterly fantasy lighting..."
               placeholderTextColor={Colors.placeholder}
               multiline
               textAlignVertical="top"
@@ -1966,7 +1976,7 @@ Output ONLY the character description, nothing else.`,
               onPress={handleSaveCharacter}
               disabled={!newCharacterName.trim() || !newCharacterDescription.trim()}
             >
-              <Text style={styles.insertImageButtonText}>Save Character</Text>
+              <Text style={styles.insertImageButtonText}>Save Seed</Text>
             </Pressable>
           </View>
         </SafeAreaView>
