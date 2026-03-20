@@ -346,10 +346,14 @@ export default function ChatScreen() {
   const [showCharacterLibrary, setShowCharacterLibrary] = useState(false);
   const [selectedCharacters, setSelectedCharacters] = useState<SavedCharacter[]>([]);
   const [showSaveCharacterModal, setShowSaveCharacterModal] = useState(false);
+  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
   const [newCharacterName, setNewCharacterName] = useState("");
   const [newCharacterDescription, setNewCharacterDescription] = useState("");
   const [pendingCharacterImage, setPendingCharacterImage] = useState<{ base64Data: string; mimeType: string } | null>(null);
   const [isAnalyzingCharacter, setIsAnalyzingCharacter] = useState(false);
+  const isEditingSavedCharacter = editingCharacterId !== null;
+  const saveSeedModalTitle = isEditingSavedCharacter ? "Edit Seed" : "Save Seed";
+  const saveSeedModalButtonText = isEditingSavedCharacter ? "Save Changes" : "Save Seed";
 
   const { messages, sendMessage, setMessages } = useRorkAgent({
     tools: {},
@@ -839,11 +843,37 @@ export default function ChatScreen() {
     setSelectedCharacters([]);
   };
 
+  const handleCloseSaveCharacterModal = () => {
+    setShowSaveCharacterModal(false);
+    setEditingCharacterId(null);
+    setPendingCharacterImage(null);
+    setNewCharacterName("");
+    setNewCharacterDescription("");
+    setIsAnalyzingCharacter(false);
+  };
+
   const handleOpenSaveCharacter = () => {
     if (!generatedImage) return;
+    setEditingCharacterId(null);
     setPendingCharacterImage(generatedImage);
     setNewCharacterName("");
     setNewCharacterDescription(imagePrompt.trim());
+    setShowSaveCharacterModal(true);
+  };
+
+  const handleOpenEditCharacter = (character: SavedCharacter) => {
+    console.log('Opening saved seed for editing:', character.name);
+    setEditingCharacterId(character.id);
+    setNewCharacterName(character.name);
+    setNewCharacterDescription(character.fullDescription || character.description);
+    setPendingCharacterImage(
+      character.thumbnailBase64 && character.thumbnailMimeType
+        ? {
+            base64Data: character.thumbnailBase64,
+            mimeType: character.thumbnailMimeType,
+          }
+        : null
+    );
     setShowSaveCharacterModal(true);
   };
 
@@ -924,10 +954,10 @@ Output ONLY the seed description, nothing else.`,
 
   const handleSaveCharacter = async () => {
     if (!newCharacterName.trim() || !newCharacterDescription.trim()) return;
-    
+
     const fullDescription = newCharacterDescription.trim();
     console.log('Saving character with FULL description length:', fullDescription.length, 'characters');
-    
+
     let thumbnailData: { base64: string; mimeType: string } | null = null;
     if (pendingCharacterImage) {
       thumbnailData = await compressThumbnail(
@@ -936,26 +966,41 @@ Output ONLY the seed description, nothing else.`,
       );
       console.log('Thumbnail compressed from', pendingCharacterImage.base64Data.length, 'to', thumbnailData.base64.length);
     }
-    
-    const newCharacter: SavedCharacter = {
-      id: `char-${Date.now()}`,
+
+    const now = Date.now();
+    const existingCharacter = editingCharacterId
+      ? savedCharacters.find((character) => character.id === editingCharacterId)
+      : undefined;
+
+    const savedCharacter: SavedCharacter = {
+      id: editingCharacterId ?? `char-${now}`,
       name: newCharacterName.trim(),
       description: fullDescription.substring(0, 100),
-      fullDescription: fullDescription,
-      thumbnailBase64: thumbnailData?.base64,
-      thumbnailMimeType: thumbnailData?.mimeType,
-      createdAt: Date.now(),
+      fullDescription,
+      thumbnailBase64: thumbnailData?.base64 ?? existingCharacter?.thumbnailBase64,
+      thumbnailMimeType: thumbnailData?.mimeType ?? existingCharacter?.thumbnailMimeType,
+      createdAt: existingCharacter?.createdAt ?? now,
     };
-    
-    const updated = [...savedCharacters, newCharacter];
+
+    const updated = editingCharacterId
+      ? savedCharacters.map((character) =>
+          character.id === editingCharacterId ? savedCharacter : character
+        )
+      : [...savedCharacters, savedCharacter];
+
     setSavedCharacters(updated);
+    setSelectedCharacters((prev) =>
+      prev.map((character) =>
+        character.id === savedCharacter.id ? savedCharacter : character
+      )
+    );
     await saveCharactersToStorage(updated);
-    
-    setShowSaveCharacterModal(false);
-    setPendingCharacterImage(null);
-    setNewCharacterName("");
-    setNewCharacterDescription("");
-    console.log('Character saved with full description:', newCharacter.name);
+
+    handleCloseSaveCharacterModal();
+    console.log(
+      editingCharacterId ? 'Character updated with full description:' : 'Character saved with full description:',
+      savedCharacter.name
+    );
   };
 
   const handleDeleteCharacter = async (characterId: string) => {
@@ -1838,18 +1883,31 @@ Output ONLY the seed description, nothing else.`,
                         {character.name}
                       </Text>
                       <Text style={styles.characterCardDesc} numberOfLines={2}>
-                        {character.description}
+                        {character.fullDescription || character.description}
                       </Text>
-                      <Pressable
-                        style={styles.characterDeleteButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          void handleDeleteCharacter(character.id);
-                        }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Trash2 size={14} color={Colors.timestamp} />
-                      </Pressable>
+                      <View style={styles.characterCardActions}>
+                        <Pressable
+                          style={styles.characterEditButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditCharacter(character);
+                          }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          testID={`edit-seed-${character.id}`}
+                        >
+                          <Edit3 size={14} color={Colors.inputText} />
+                        </Pressable>
+                        <Pressable
+                          style={styles.characterDeleteButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            void handleDeleteCharacter(character.id);
+                          }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Trash2 size={14} color={Colors.timestamp} />
+                        </Pressable>
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -1885,7 +1943,7 @@ Output ONLY the seed description, nothing else.`,
         visible={showSaveCharacterModal}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setShowSaveCharacterModal(false)}
+        onRequestClose={handleCloseSaveCharacterModal}
       >
         <SafeAreaView style={styles.imageModalContainer} edges={["top", "bottom"]}>
           <View style={styles.imageModalHeader}>
@@ -1893,10 +1951,10 @@ Output ONLY the seed description, nothing else.`,
               <View style={styles.imageModalTitleIcon}>
                 <Plus size={24} color={Colors.userBubble} />
               </View>
-              <Text style={styles.imageModalTitle}>Save Seed</Text>
+              <Text style={styles.imageModalTitle}>{saveSeedModalTitle}</Text>
             </View>
             <Pressable
-              onPress={() => setShowSaveCharacterModal(false)}
+              onPress={handleCloseSaveCharacterModal}
               style={styles.imageModalClose}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -1926,6 +1984,7 @@ Output ONLY the seed description, nothing else.`,
               onChangeText={setNewCharacterName}
               placeholder="e.g., Luna, Crystal Dagger, Moonlit Courtyard, Forest Beast..."
               placeholderTextColor={Colors.placeholder}
+              testID="seed-name-input"
             />
 
             <View style={styles.descriptionLabelRow}>
@@ -1937,6 +1996,7 @@ Output ONLY the seed description, nothing else.`,
                 ]}
                 onPress={handleAutoDescribeCharacter}
                 disabled={isAnalyzingCharacter || !pendingCharacterImage}
+                testID="seed-ai-describe-button"
               >
                 <Eye size={14} color={isAnalyzingCharacter ? Colors.timestamp : Colors.userBubble} />
                 <Text style={[
@@ -1958,13 +2018,14 @@ Output ONLY the seed description, nothing else.`,
               placeholderTextColor={Colors.placeholder}
               multiline
               textAlignVertical="top"
+              testID="seed-description-input"
             />
           </ScrollView>
 
           <View style={styles.imageModalFooter}>
             <Pressable
               style={styles.regenerateButton}
-              onPress={() => setShowSaveCharacterModal(false)}
+              onPress={handleCloseSaveCharacterModal}
             >
               <Text style={styles.regenerateButtonText}>Cancel</Text>
             </Pressable>
@@ -1976,7 +2037,7 @@ Output ONLY the seed description, nothing else.`,
               onPress={handleSaveCharacter}
               disabled={!newCharacterName.trim() || !newCharacterDescription.trim()}
             >
-              <Text style={styles.insertImageButtonText}>Save Seed</Text>
+              <Text style={styles.insertImageButtonText}>{saveSeedModalButtonText}</Text>
             </Pressable>
           </View>
         </SafeAreaView>
@@ -2848,10 +2909,23 @@ const styles = StyleSheet.create({
     color: Colors.timestamp,
     lineHeight: 15,
   },
-  characterDeleteButton: {
+  characterCardActions: {
     position: "absolute" as const,
     top: 8,
     right: 8,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  characterEditButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.82)",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  characterDeleteButton: {
     width: 28,
     height: 28,
     borderRadius: 14,
