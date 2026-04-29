@@ -34,6 +34,21 @@ type SavedCharacter = {
   createdAt: number;
 };
 
+type ImageGenerationResponse = {
+  images?: string[];
+  warnings?: string[];
+  providerMetadata?: {
+    gateway?: {
+      generationId?: string;
+      marketCost?: string;
+    };
+  };
+};
+
+const DREAM_WEAVER_IMAGE_MODEL = "openai/gpt-image-2";
+const TOOLKIT_URL = process.env.EXPO_PUBLIC_TOOLKIT_URL ?? "https://toolkit.rork.com";
+const TOOLKIT_SECRET_KEY = process.env.EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY ?? "";
+
 
 
 function compressThumbnail(base64: string, mimeType: string): Promise<{ base64: string; mimeType: string }> {
@@ -769,12 +784,25 @@ export default function ChatScreen() {
       console.log("Starting image generation with prompt:", enhancedPrompt);
       console.log("Size:", sizeMap[imageSize]);
       
-      const response = await fetch("https://toolkit.rork.com/images/generate/", {
+      if (!TOOLKIT_SECRET_KEY) {
+        throw new Error("Dream Weaver is missing its image generation key.");
+      }
+
+      const response = await fetch(`${TOOLKIT_URL}/v2/vercel/v3/ai/image-model`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${TOOLKIT_SECRET_KEY}`,
+          "Content-Type": "application/json",
+          "ai-gateway-protocol-version": "0.0.1",
+          "ai-image-model-specification-version": "4",
+          "ai-model-id": DREAM_WEAVER_IMAGE_MODEL,
+        },
         body: JSON.stringify({
+          model: DREAM_WEAVER_IMAGE_MODEL,
           prompt: enhancedPrompt,
+          n: 1,
           size: sizeMap[imageSize],
+          providerOptions: {},
         }),
       });
 
@@ -786,16 +814,19 @@ export default function ChatScreen() {
         throw new Error(`Failed to generate image: ${response.status}`);
       }
 
-      const data = await response.json();
-      console.log("Got image data, mimeType:", data.image?.mimeType);
+      const data = (await response.json()) as ImageGenerationResponse;
+      console.log("Got image data from model:", DREAM_WEAVER_IMAGE_MODEL);
+      console.log("Gateway generation id:", data.providerMetadata?.gateway?.generationId);
+      console.log("Warnings:", data.warnings);
       
-      const base64 = data.image?.base64Data || data.image?.base64;
+      const base64 = data.images?.[0];
       console.log("Base64 length:", base64?.length);
       
-      if (base64 && data.image?.mimeType) {
-        setGeneratedImage({ base64Data: base64, mimeType: data.image.mimeType });
+      if (base64) {
+        setGeneratedImage({ base64Data: base64, mimeType: "image/png" });
       } else {
         console.error("No image data in response:", data);
+        throw new Error("Dream Weaver did not return an image.");
       }
     } catch (error) {
       console.error("Error generating image:", error);
