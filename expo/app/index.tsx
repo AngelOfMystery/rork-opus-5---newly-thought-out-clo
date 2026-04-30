@@ -34,7 +34,58 @@ type SavedCharacter = {
   createdAt: number;
 };
 
+const POLLINATIONS_IMAGE_BASE_URL = "https://image.pollinations.ai/prompt";
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+}
+
+function getPollinationsImageUrl(prompt: string, size: string): string {
+  const [width = "1024", height = "1024"] = size.split("x");
+  const params = new URLSearchParams({
+    width,
+    height,
+    nologo: "true",
+    private: "true",
+    enhance: "true",
+    seed: `${Date.now()}`,
+  });
+
+  return `${POLLINATIONS_IMAGE_BASE_URL}/${encodeURIComponent(prompt)}?${params.toString()}`;
+}
+
+async function fetchImageAsBase64(imageUrl: string): Promise<{ base64Data: string; mimeType: string }> {
+  console.log("Fetching Pollinations image from URL:", imageUrl);
+  const response = await fetch(imageUrl, {
+    method: "GET",
+    headers: {
+      Accept: "image/*",
+    },
+  });
+
+  console.log("Pollinations response status:", response.status);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Pollinations error response:", errorText);
+    throw new Error(`Pollinations image request failed: ${response.status}`);
+  }
+
+  const mimeType = response.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+  const base64Data = arrayBufferToBase64(await response.arrayBuffer());
+  console.log("Pollinations image loaded, mimeType:", mimeType, "base64 length:", base64Data.length);
+
+  return { base64Data, mimeType };
+}
 
 function compressThumbnail(base64: string, mimeType: string): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve) => {
@@ -766,37 +817,12 @@ export default function ChatScreen() {
     const enhancedPrompt = buildImagePrompt();
 
     try {
-      console.log("Starting image generation with prompt:", enhancedPrompt);
+      console.log("Starting Pollinations image generation with prompt:", enhancedPrompt);
       console.log("Size:", sizeMap[imageSize]);
-      
-      const response = await fetch("https://toolkit.rork.com/images/generate/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: enhancedPrompt,
-          size: sizeMap[imageSize],
-        }),
-      });
 
-      console.log("Response status:", response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API error response:", errorText);
-        throw new Error(`Failed to generate image: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Got image data, mimeType:", data.image?.mimeType);
-      
-      const base64 = data.image?.base64Data || data.image?.base64;
-      console.log("Base64 length:", base64?.length);
-      
-      if (base64 && data.image?.mimeType) {
-        setGeneratedImage({ base64Data: base64, mimeType: data.image.mimeType });
-      } else {
-        console.error("No image data in response:", data);
-      }
+      const imageUrl = getPollinationsImageUrl(enhancedPrompt, sizeMap[imageSize]);
+      const imageData = await fetchImageAsBase64(imageUrl);
+      setGeneratedImage(imageData);
     } catch (error) {
       console.error("Error generating image:", error);
     } finally {
