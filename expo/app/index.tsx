@@ -34,7 +34,8 @@ type SavedCharacter = {
   createdAt: number;
 };
 
-const POLLINATIONS_IMAGE_BASE_URL = "https://image.pollinations.ai/prompt";
+const POLLINATIONS_IMAGE_BASE_URL = "https://gen.pollinations.ai/image";
+const POLLINATIONS_IMAGE_KEY = "pk_SeM76btBI6WVKaxY";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -52,6 +53,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 function getPollinationsImageUrl(prompt: string, size: string): string {
   const [width = "1024", height = "1024"] = size.split("x");
   const params = new URLSearchParams({
+    model: "gptimage",
+    key: POLLINATIONS_IMAGE_KEY,
     width,
     height,
     nologo: "true",
