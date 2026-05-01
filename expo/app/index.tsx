@@ -52,6 +52,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 function getPollinationsImageUrl(prompt: string, size: string): string {
   const [width = "1024", height = "1024"] = size.split("x");
+  const maxPollinationsSeed = 2147483647;
+  const seed = Math.floor(Math.random() * maxPollinationsSeed).toString();
   const params = new URLSearchParams({
     model: "gptimage",
     key: POLLINATIONS_IMAGE_KEY,
@@ -60,7 +62,7 @@ function getPollinationsImageUrl(prompt: string, size: string): string {
     nologo: "true",
     private: "true",
     enhance: "true",
-    seed: `${Date.now()}`,
+    seed,
   });
 
   return `${POLLINATIONS_IMAGE_BASE_URL}/${encodeURIComponent(prompt)}?${params.toString()}`;
@@ -827,7 +829,8 @@ export default function ChatScreen() {
       const imageData = await fetchImageAsBase64(imageUrl);
       setGeneratedImage(imageData);
     } catch (error) {
-      console.error("Error generating image:", error);
+      const message = error instanceof Error ? error.message : "Unknown image generation error";
+      console.error("Error generating image:", message);
     } finally {
       setIsGeneratingImage(false);
     }
