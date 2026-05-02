@@ -55,7 +55,7 @@ function getPollinationsImageUrl(prompt: string, size: string): string {
   const maxPollinationsSeed = 2147483647;
   const seed = Math.floor(Math.random() * maxPollinationsSeed).toString();
   const params = new URLSearchParams({
-    model: "gptimage",
+    model: "gptimage-large",
     key: POLLINATIONS_IMAGE_KEY,
     width,
     height,
