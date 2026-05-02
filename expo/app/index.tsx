@@ -35,7 +35,7 @@ type SavedCharacter = {
 };
 
 const POLLINATIONS_IMAGE_BASE_URL = "https://gen.pollinations.ai/image";
-const POLLINATIONS_IMAGE_KEY = "pk_SeM76btBI6WVKaxY";
+const POLLINATIONS_IMAGE_KEYS = ["pk_SeM76btBI6WVKaxY", "pk_sDy7Mrbxv4kDwl6C"] as const;
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -50,13 +50,13 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-function getPollinationsImageUrl(prompt: string, size: string): string {
+function getPollinationsImageUrl(prompt: string, size: string, key: string): string {
   const [width = "1024", height = "1024"] = size.split("x");
   const maxPollinationsSeed = 2147483647;
   const seed = Math.floor(Math.random() * maxPollinationsSeed).toString();
   const params = new URLSearchParams({
     model: "gptimage-large",
-    key: POLLINATIONS_IMAGE_KEY,
+    key,
     width,
     height,
     nologo: "true",
@@ -66,6 +66,24 @@ function getPollinationsImageUrl(prompt: string, size: string): string {
   });
 
   return `${POLLINATIONS_IMAGE_BASE_URL}/${encodeURIComponent(prompt)}?${params.toString()}`;
+}
+
+async function generatePollinationsImage(prompt: string, size: string): Promise<{ base64Data: string; mimeType: string }> {
+  let lastError: unknown;
+
+  for (const [index, key] of POLLINATIONS_IMAGE_KEYS.entries()) {
+    try {
+      const imageUrl = getPollinationsImageUrl(prompt, size, key);
+      console.log(`Trying Pollinations image generation endpoint ${index + 1}/${POLLINATIONS_IMAGE_KEYS.length}`);
+      return await fetchImageAsBase64(imageUrl);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : "Unknown Pollinations error";
+      console.warn(`Pollinations endpoint ${index + 1} failed:`, message);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("All Pollinations image endpoints failed");
 }
 
 async function fetchImageAsBase64(imageUrl: string): Promise<{ base64Data: string; mimeType: string }> {
@@ -825,8 +843,7 @@ export default function ChatScreen() {
       console.log("Starting Pollinations image generation with prompt:", enhancedPrompt);
       console.log("Size:", sizeMap[imageSize]);
 
-      const imageUrl = getPollinationsImageUrl(enhancedPrompt, sizeMap[imageSize]);
-      const imageData = await fetchImageAsBase64(imageUrl);
+      const imageData = await generatePollinationsImage(enhancedPrompt, sizeMap[imageSize]);
       setGeneratedImage(imageData);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown image generation error";
