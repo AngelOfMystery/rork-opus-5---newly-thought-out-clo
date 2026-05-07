@@ -1151,35 +1151,65 @@ Output ONLY the seed description, nothing else.`,
     setEditedImageResult(null);
 
     try {
-      console.log("Starting Pollinations image edit with prompt:", editImagePrompt);
-
-      const buildEditPrompt = (): string => {
-        const originalPrompt = editingImageOriginalStyle?.prompt.trim();
-        const styleHint = originalPrompt
-          ? `Use this as the visual continuity seed from the original image: "${originalPrompt}". `
-          : "Preserve the composition, subject identity, lighting, materials, color palette, and overall art direction of the source image as closely as possible. ";
-
-        const editInstructions = `Create an edited version of an existing image. ${styleHint}Apply this edit comprehensively across the whole image: "${editImagePrompt.trim()}". If the request changes an element, replace ALL matching instances and update connected details, reflections, decorations, background cues, and colors so the result feels intentionally transformed rather than partially changed.`;
-
-        if (sagePersonality.trim()) {
-          return `[STYLE INSTRUCTIONS FROM PERSONALITY: ${sagePersonality.trim()}]\n\n${editInstructions}`;
+      console.log("Starting image edit with prompt:", editImagePrompt);
+      
+      let base64Data = editingImageUri;
+      if (editingImageUri.includes('base64,')) {
+        base64Data = editingImageUri.split('base64,')[1];
+      } else if (editingImageUri.startsWith('data:')) {
+        const commaIndex = editingImageUri.indexOf(',');
+        if (commaIndex !== -1) {
+          base64Data = editingImageUri.substring(commaIndex + 1);
         }
+      }
+      
+      console.log("Base64 data length:", base64Data.length);
 
-        return editInstructions;
+      const buildEditPrompt = () => {
+        let finalPrompt = editImagePrompt.trim();
+        
+        const styleHint = editingImageOriginalStyle 
+          ? `Preserve the original art style from: "${editingImageOriginalStyle.prompt.substring(0, 200)}". ` 
+          : '';
+        
+        const editInstructions = `Edit this image comprehensively: when changing elements (like strawberry to blueberry), replace ALL instances including fillings, decorations, background items, and adjust related colors throughout. ${styleHint}`;
+        
+        finalPrompt = editInstructions + "Request: " + finalPrompt;
+        
+        console.log("Final edit prompt length:", finalPrompt.length);
+        return finalPrompt;
       };
 
-      const sizeMap: Record<typeof editImageAspectRatio, string> = {
-        "1:1": "1024x1024",
-        "9:16": "1024x1536",
-        "16:9": "1536x1024",
+      const requestBody = {
+        prompt: buildEditPrompt(),
+        images: [{ type: "image", image: base64Data }],
+        aspectRatio: editImageAspectRatio,
       };
+      
+      console.log("Sending edit request with aspectRatio:", editImageAspectRatio);
 
-      const enhancedPrompt = buildEditPrompt();
-      console.log("Final Pollinations edit prompt length:", enhancedPrompt.length);
-      console.log("Edit size:", sizeMap[editImageAspectRatio]);
+      const response = await fetch("https://toolkit.rork.com/images/edit/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
 
-      const imageData = await generatePollinationsImage(enhancedPrompt, sizeMap[editImageAspectRatio]);
-      setEditedImageResult(imageData);
+      console.log("Edit response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Edit API error:", errorText);
+        throw new Error(`Failed to edit image: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Got edited image, mimeType:", data.image?.mimeType);
+
+      if (data.image?.base64Data && data.image?.mimeType) {
+        setEditedImageResult({ base64Data: data.image.base64Data, mimeType: data.image.mimeType });
+      } else {
+        console.error("No image data in edit response:", data);
+      }
     } catch (error) {
       console.error("Error editing image:", error);
     } finally {
